@@ -71,7 +71,7 @@ class ConvModel:
         return loss
 
     # 3) calculate gradient and optimize --> adapts weights
-    def optimize(self, loss, learning_rate=1e-3):
+    def optimize(self, loss, learning_rate=1e-4):
         optimizer = tf.train.AdamOptimizer(learning_rate).minimize(loss, global_step=self.global_step)
 
         return optimizer, self.global_step
@@ -126,7 +126,7 @@ if __name__ == "__main__":
     epochs = 10
 
     with tf.Session() as sess:
-        summary_writer = tf.summary.FileWriter('./summaries/', sess.graph)
+        summary_writer = tf.summary.FileWriter('./records/summaries', sess.graph)
 
         sess.run(tf.global_variables_initializer())
 
