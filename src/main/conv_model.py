@@ -13,12 +13,14 @@ class ConvModel:
         self.label_ph = tf.placeholder(tf.int32, shape=[1,])
         self.batch_size=batch_size
         self.global_step = tf.Variable(0, trainable=False)
+        self.saver = tf.train.Saver()
     
 
     def preprocess(self):
         spectrogram = tf.expand_dims(self.input_ph,0)
         spectrogram = tf.transpose(tf.expand_dims(spectrogram,-1), [0,2,1,3])
         tf.summary.image('Spectrogram', spectrogram)
+        tf.summary.histogram('Spec_Hist', spectrogram)
         print(spectrogram)
         cropped_spectrogram = tf.image.resize_image_with_crop_or_pad(spectrogram, target_height=221, target_width=250)
         print(cropped_spectrogram)
@@ -58,8 +60,8 @@ class ConvModel:
         # now: net contains 8 predictions
         net = tf.layers.dense(net, 8)
         print(net)
-        input('...')
 
+        # Result of a forward pass
         return net
 
     # 2) compare outcome with true labels
@@ -89,36 +91,20 @@ class ConvModel:
 
 
 
-
-        '''model = Sequential()
-        model.add(Conv2D(32, kernel_size=(3,3),
-                         activation='relu',
-                         input_shape=[28, 28, 1]))
-        model.add(Conv2D(64, (3, 3), activation='relu'))
-        model.add(MaxPooling2D(pool_size=(2,2)))
-        model.add(Dropout(0.25))
-        model.add(Flatten())
-        model.add(Dense(128, activation='softmax'))
-        print(model)
-        input('model')
-
-        model.compile(loss=keras.losses.categorical_crossentropy,
-                      optimizer=keras.optimizers.Adam(),
-                      metrics=['accurarcy'])
-
-        model.fit(data, labels,
-                  epochs=epochs,
-                  bacht_size=batch_size,
-                  verbose=1)'''
-            
-        
-
-
-        
-
-
 if __name__ == "__main__":
     list_files, _ = list_all_files()
+
+    if os.path.isdir('./records/summaries'):
+        while True:
+            user_input = input('Delete summaries? y/[n]\n')
+            if user_input.lower() in ['y', 'yes', '1', 'true']:
+                print('Deleting summary directory')
+                os.system('rm -r ./records/summaries')
+                break
+            else:
+                print('Keeping summary files')
+                break
+
 
     model = ConvModel()
     optimize_op, loss_op, step_op, summ_op = model.build()
@@ -138,12 +124,14 @@ if __name__ == "__main__":
 
                 samples, sr = load_wav(file)
                 freqs, time, spectrogram = log_specgram(samples, sr)
-                #print(np.shape(spectrogram))
+                
                 _, np_loss, step, summaries = sess.run([optimize_op, loss_op, step_op, summ_op], feed_dict={model.input_ph:spectrogram,
                                                             model.label_ph:[emotion_number]})
 
                 print('iteration {} : loss = {}'.format(step, np_loss))
-                if step % 10 == 0:
+                if step % 25 == 0:
+                    save_path = model.saver.save(sess, './records/checkpoints/model')
                     summary_writer.add_summary(summaries, step)
+                    print('Saved model to {} and wrote summaries.'.format(save_path))
                 
 
