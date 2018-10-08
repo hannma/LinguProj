@@ -8,7 +8,7 @@ from tensorflow.nn.rnn_cell import GRUCell, MultiRNNCell
 
 class RNNModel:
     def __init__(self, batch_size=1):
-        self.input_ph = tf.placeholder(tf.float32, shape=[batch_size, 250, 221])
+        self.input_ph = tf.placeholder(tf.float32, shape=[batch_size, 221, 250])
         self.label_ph = tf.placeholder(tf.int32, shape=[batch_size,])
         self.batch_size=batch_size
         self.global_step = tf.Variable(0, trainable=False)
@@ -16,7 +16,7 @@ class RNNModel:
     
 
     def preprocess(self):
-        spectrogram = tf.transpose(tf.expand_dims(self.input_ph, -1), [0,2,1,3])
+        spectrogram = tf.expand_dims(self.input_ph, -1)
         tf.summary.image('spectrogram', spectrogram)
         print(spectrogram)
 
@@ -27,6 +27,7 @@ class RNNModel:
     def model(self, train_x, epochs=1, batch_size=1):
         print('trainx', train_x)
 
+        '''
         with tf.variable_scope('CNN'):
             conv_net = tf.layers.conv2d(train_x, filters=64, kernel_size=(7, 7), strides=(1, 1), 
                                 padding='SAME', activation=tf.nn.relu, name='Conv1')
@@ -61,19 +62,18 @@ class RNNModel:
             conv_out = tf.contrib.layers.flatten(conv_net)
             conv_out = tf.layers.dense(conv_out, 250)
             print(conv_out)
+        '''
 
         with tf.variable_scope('RNN'):
 
-            rnn_inp = tf.expand_dims(conv_out, -1)
-            print(rnn_inp)
+            #rnn_inp = tf.expand_dims(conv_out, -1)
+            #print(rnn_inp)
 
             num_units = [64, 128, 256]
             cell = MultiRNNCell([GRUCell(n) for n in num_units])
-            out, state = tf.nn.dynamic_rnn(cell, rnn_inp, dtype=tf.float32)
-            print('out', out)
-            out = tf.squeeze(out)[-1]
-            print('out', out)
-            fc_out = tf.layers.dense(tf.expand_dims(out,0), 1024, activation=tf.sigmoid)
+            out, state = tf.nn.dynamic_rnn(cell, tf.squeeze(train_x, [-1]), dtype=tf.float32)
+
+            fc_out = tf.layers.dense(state[-1], 1024, activation=tf.sigmoid)
             fc_out = tf.layers.dense(fc_out, 8, activation=tf.sigmoid)
             print(fc_out)
             return fc_out
@@ -119,7 +119,9 @@ if __name__ == "__main__":
                 break
 
 
-    model = RNNModel()
+    batchsize = 3
+
+    model = RNNModel(batchsize)
     optimize_op, loss_op, step_op, summ_op = model.build()
 
     epochs = 10
@@ -142,13 +144,13 @@ if __name__ == "__main__":
             train_data = train_data[shuffle_idx]
             train_labels = train_labels[shuffle_idx]
 
-            for smpl_nr in range(N_SAMPLES):
+            for smpl_nr in range(N_SAMPLES // batchsize) :
 
-                train_x = train_data[smpl_nr].T
-                train_y = train_labels[smpl_nr]
+                train_x = train_data[smpl_nr:smpl_nr + batchsize]
+                train_y = train_labels[smpl_nr:smpl_nr + batchsize]
 
-                _, np_loss, step, summaries = sess.run([optimize_op, loss_op, step_op, summ_op], feed_dict={model.input_ph:[train_x],
-                                                            model.label_ph:[train_y]})
+                _, np_loss, step, summaries = sess.run([optimize_op, loss_op, step_op, summ_op], feed_dict={model.input_ph:train_x,
+                                                            model.label_ph:train_y})
 
                 sys.stdout.write('\rIteration {} : loss = {}'.format(step, np_loss))
                 sys.stdout.flush()
